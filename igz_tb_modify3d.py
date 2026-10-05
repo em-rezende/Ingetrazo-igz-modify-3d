@@ -17,6 +17,10 @@
 
 # =========================================================================
 # Extension: igz_tb_modify3d (Carregador Principal com Suporte a Ícones por Tema)
+# Author: Ezequiel M Rezende
+# Version: 1.0.0
+# Date: 2026-10-05
+# License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations
 
@@ -97,7 +101,7 @@ def setup(app):
     window = getattr(app, "window", None)
     vp = getattr(app, "viewport", None)
     if window is None or vp is None:
-        raise RuntimeError("ExtensionApp has no window/viewport")[cite: 1]
+        raise RuntimeError("ExtensionApp has no window/viewport")
     
     old = window.findChild(QToolBar, "igz_tb_modify3d")
     if old is not None:

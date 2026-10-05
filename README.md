@@ -122,6 +122,16 @@ __all__ = ["setup"]
 If the toolbar is not visible after restarting, make sure the plugin was placed in
 the correct directory and that no import error was reported in the IngeTrazo log.
 
+### From the IngeTrazo extension catalog
+
+The plugin is also packaged for the community catalog at
+<https://ingetrazo.com/extensiones> (repository
+<https://github.com/ingelibre/ingetrazo-extensions>), which installs a single
+`.zip` holding one folder with an `__init__.py`. Build that archive with
+`packaging/build_extension.ps1` (Windows) or `packaging/build_extension.py`
+(any platform); it lands in `dist/igz_modify3d.zip`. See
+[`PUBLISHING.md`](PUBLISHING.md) for the release and submission steps.
+
 ---
 
 ## Usage
