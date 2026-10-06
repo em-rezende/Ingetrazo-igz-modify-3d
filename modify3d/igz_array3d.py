@@ -17,6 +17,9 @@
 
 # =========================================================================
 # Extension: igz_array3d (Subpasta modify3d)
+# Author: Ezequiel M Rezende
+# Version: 1.0.1
+# License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations
 
@@ -104,14 +107,19 @@ class Array3dTool(Tool):
     def on_deactivate(self, vp):
         self.points = []
         self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        try:
+            vp.update()
+        except Exception:
+            pass
 
     def on_cancel(self, vp):
         self.points = []
         self.current_mouse_pos = None
-        self.bbox_min = None
         vp.flash_status("", 0)
+        try:
+            vp.update()
+        except Exception:
+            pass
 
     def on_hover(self, ctx: ToolContext):
         if len(self.points) == 1:

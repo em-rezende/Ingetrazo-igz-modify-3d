@@ -17,16 +17,20 @@
 
 # =========================================================================
 # Extension: igz_mirror3d (Subpasta modify3d)
+# Author: Ezequiel M Rezende
+# Version: 1.0.1
+# License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations
 import copy, os, sys, traceback
-from PySide6.QtCore import Qt, QSize, QTimer
-from PySide6.QtGui import QAction, QIcon, QMatrix4x4, QVector3D, QVector4D, QPen, QColor
-from PySide6.QtWidgets import QMessageBox, QToolBar, QSizePolicy
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QMatrix4x4, QVector3D, QVector4D, QPen, QColor
+from PySide6.QtWidgets import QMessageBox
 from tools.base import Tool, ToolContext
 from core.group import Group, copy_group, transformed_mesh
 from core.mesh import Face, Edge
-from core.history import SnapshotImport, EraseSelectionCommand
+from core.history import SnapshotImport
+from igz_xform_command import XformGroupsCommand, CompositeCommand
 
 DEBUG = True
 
@@ -213,38 +217,81 @@ class Mirror3dTool(Tool):
         except Exception:
             pass
         QTimer.singleShot(80, lambda: self._finish(vp,m))
-
-    def _finish(self,vp,m):
-        ans=QMessageBox.question(vp.window(),_t("Mirror 3D"),_t("Do you want to delete the original objects?"),QMessageBox.Yes|QMessageBox.No,QMessageBox.No)
-        delete=ans==QMessageBox.Yes; selected=set(self.selection)
-        def mutate(scene):
-            for x in selected:
-                if isinstance(x,Group): scene.groups.append(_copy_group(x,m))
-            loose=[x for x in selected if isinstance(x,(Face,Edge))]
-            if loose:_copy_loose(scene,loose,m)
-            if delete:
-                for g in [x for x in selected if isinstance(x,Group)]:
-                    if g in scene.groups: scene.groups.remove(g)
-                    scene.selection.discard(g)
-                faces=[x for x in selected if isinstance(x,Face)]; edges=[x for x in selected if isinstance(x,Edge)]
-                if faces or edges: EraseSelectionCommand(edges,faces).do(scene)
-            scene.selection.clear()
+    def _finish(self, vp, m):
         try:
-            vp.history.execute(SnapshotImport(mutate))
-            if vp.history.last_error:
-                vp.flash_status(f"Mirror failed: {vp.history.last_error}",6000); _log(vp.history.last_error)
+            ans = QMessageBox.question(
+                vp.window(),
+                _t("Mirror 3D"),
+                _t("Do you want to delete the original objects?"),
+                QMessageBox.Yes | QMessageBox.No,
+                QMessageBox.No,
+            )
+            delete = ans == QMessageBox.Yes
+            selected = set(self.selection)
+
+            # 1. SnapshotImport — adição das cópias espelhadas.
+            def add_mirrored(scene):
+                for x in selected:
+                    if isinstance(x, Group):
+                        scene.groups.append(_copy_group(x, m))
+                loose = [x for x in selected if isinstance(x, (Face, Edge))]
+                if loose:
+                    _copy_loose(scene, loose, m)
+
+            # NÃO passe label= — SnapshotImport não aceita esse kwarg.
+            add_cmd = SnapshotImport(add_mirrored)
+
+            # 2. Remoção opcional dos originais (undo-aware).
+            groups_to_remove = [x for x in selected if isinstance(x, Group)]
+
+            if delete and groups_to_remove:
+                def noop(_g):
+                    pass
+
+                remove_cmd = XformGroupsCommand(
+                    noop,
+                    groups_to_remove,
+                    remove_after=True,
+                    label=_t("Mirror 3D (delete originals)"),
+                )
+                cmd = CompositeCommand(
+                    add_cmd, remove_cmd, label=_t("Mirror 3D")
+                )
             else:
-                vp.notify_scene_changed(); vp.update(); vp.flash_status(_t("Mirror completed."),3000)
+                cmd = add_cmd
+
+            vp.history.execute(cmd)
+            if vp.history.last_error:
+                vp.flash_status(
+                    f"Mirror failed: {vp.history.last_error}", 6000
+                )
+                _log(vp.history.last_error)
+            else:
+                vp.scene.selection.clear()
+                vp.notify_scene_changed()
+                vp.update()
+                vp.flash_status(_t("Mirror completed."), 3000)
         except Exception:
-            traceback.print_exc(); vp.flash_status("Mirror failed — see the IngeTrazo log.",6000)
+            traceback.print_exc()
+            vp.flash_status(
+                "Mirror failed — see the IngeTrazo log.", 6000
+            )
         finally:
-            self.points=[]
-            self.current_mouse_pos=None
-            self.preview_matrix=None
+            # Limpa preview SEMPRE, mesmo se o try falhou.
+            self.points = []
+            self.current_mouse_pos = None
+            self.selection_bbox = None
+            self.preview_matrix = None
+            self.preview_visible = False
+            try:
+                vp.update()
+            except Exception:
+                pass
             try:
                 from tools.select import SelectTool
                 vp.set_active_tool(SelectTool())
-            except Exception: vp.set_active_tool(None)
+            except Exception:
+                vp.set_active_tool(None)
 
 def setup(app):
     pass

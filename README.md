@@ -32,6 +32,7 @@ its operation in the application's undo/redo history.
 - [Localization](#localization)
 - [Theming and Icons](#theming-and-icons)
 - [Development Notes](#development-notes)
+- [Changelog](#changelog)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -45,8 +46,12 @@ its operation in the application's undo/redo history.
   or elastic "rubber band" guides while you pick points.
 - **Snapping support** — the tools declare `uses_snap = True`, so they inherit the
   application's object snap behavior.
-- **Undo/redo integration** — all modifications are committed through a history
-  snapshot (`SnapshotImport`), so every operation can be undone and redone.
+- **Full undo/redo** — every operation is committed to the application's history
+  and can be reversed with **Ctrl+Z** and repeated with **Ctrl+Y**. Mirror, Array
+  and Polar Array *add* new groups through the host `SnapshotImport`; the in-place
+  tools (Scale, Rotate, Align and Mirror-with-delete) commit an undo-aware
+  `XformGroupsCommand` that snapshots and restores each group's exact pre-state,
+  so even the originals removed by Mirror come back on undo.
 - **Works with groups and loose geometry** — grouped objects are transformed
   through their transform matrix (or their mesh when no matrix is present);
   standalone faces and edges are handled as well.
@@ -88,6 +93,11 @@ from core.mesh import Face, Edge
 from core.history import SnapshotImport
 from core.i18n import tr, current_language
 ```
+
+The in-place tools (Scale, Rotate, Align and Mirror-with-delete) also use the
+plugin's own `modify3d/igz_xform_command.py` — an undo-aware command that captures
+and restores each group's previous `xform` / `mesh` / `axes`, and re-inserts a
+deleted group at its original index in `scene.groups`.
 
 If IngeTrazo or PySide6 is missing, the plugin will fail to load.
 
@@ -239,6 +249,7 @@ Ingetrazo-igz-modify-3d/
 │   ├── igz_polararray3d.py    # Polar Array by Axis tool
 │   ├── igz_rotate3d.py        # Rotate by 3 Points tool
 │   ├── igz_scale3d.py         # Scale by 3 Points tool
+│   ├── igz_xform_command.py   # Undo-aware transform / removal command
 │   └── icons/
 │       ├── tb_align3d.svg          # dark-theme icon
 │       ├── tb_align3d_light.svg    # light-theme icon
@@ -317,12 +328,39 @@ means you can override the icons of any tool simply by dropping a
 - **Icon sources** — the original CorelDRAW sources (`.cdr`) live in the
   `Desenvolvimento/` folder, which is excluded from version control via
   `.gitignore`. Only the exported `.svg` files are shipped.
-- **Error handling** — transformations run inside a history snapshot; if the
-  snapshot fails, the tool reports `… failed — see the IngeTrazo log` and the
-  operation is rolled back.
+- **Undo model** — Mirror, Array and Polar Array only *add* groups, which the host
+  `SnapshotImport` snapshot reverses on its own. Scale, Rotate and Align mutate
+  groups in place, and Mirror-with-delete removes them, so those tools commit an
+  `XformGroupsCommand` (`modify3d/igz_xform_command.py`) instead: it records each
+  group's old `xform` / `mesh` / `axes` and its index in `scene.groups`, and
+  restores all of it on undo. Mirror-with-delete composes both kinds of command
+  through a `CompositeCommand`.
+- **Error handling** — if a command fails, the tool reports
+  `… failed — see the IngeTrazo log` and the operation is rolled back.
 - **Extending the toolbar** — to add a tool, create a new `igz_<tool>.py` module in
   `modify3d/`, import it in `igz_tb_modify3d.py`, and add a `QAction` that sets the
   tool as the active tool on the viewport.
+
+---
+
+## Changelog
+
+### 1.0.1 — 2026-10-06
+
+- **Fixed:** **Ctrl+Z** now fully undoes **Scale by 3 Points**, **Rotate by
+  3 Points**, **Align by Points** and **Mirror by 3 Points** with *delete the
+  originals*. Those tools change groups in place or remove them, which the host
+  `SnapshotImport` snapshot could not reverse — the mirrored originals used to be
+  lost. They now commit an undo-aware `XformGroupsCommand` that restores each
+  group's previous transform/mesh and re-inserts removed groups at their original
+  position. This addresses the review on the IngeTrazo extension-catalog pull
+  request.
+- Added `modify3d/igz_xform_command.py` (`XformGroupsCommand`, `CompositeCommand`).
+
+### 1.0.0 — 2026-10-05
+
+- First public release: the **3D Modifiers** toolbar with Mirror, Scale, Rotate,
+  Align, Array and Polar Array — live previews, snapping and theme-aware icons.
 
 ---
 

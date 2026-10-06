@@ -18,8 +18,8 @@
 # =========================================================================
 # Extension: igz_tb_modify3d (Carregador Principal com Suporte a Ícones por Tema)
 # Author: Ezequiel M Rezende
-# Version: 1.0.0
-# Date: 2026-10-05
+# Version: 1.0.1
+# Date: 2026-10-06
 # License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations

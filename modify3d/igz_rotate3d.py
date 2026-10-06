@@ -17,6 +17,9 @@
 
 # =========================================================================
 # Extension: igz_rotate3d (Subpasta modify3d)
+# Author: Ezequiel M Rezende
+# Version: 1.0.1
+# License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations
 
@@ -33,7 +36,7 @@ from PySide6.QtWidgets import QMessageBox, QToolBar, QSizePolicy
 from tools.base import Tool, ToolContext
 from core.group import Group, transformed_mesh
 from core.mesh import Face, Edge
-from core.history import SnapshotImport
+from igz_xform_command import XformGroupsCommand
 
 DEBUG = True
 
@@ -118,6 +121,8 @@ class Rotate3dTool(Tool):
     shortcut = None
     description = "Rotate the selected objects using three reference points with bounding box preview."
     uses_snap = True
+    wireframe_color = (1.0, 0.65, 0.0, 0.95)  # laranja
+    wireframe_depth_tested = False
     _instance = None
 
     def __init__(self):
@@ -227,24 +232,27 @@ class Rotate3dTool(Tool):
             return []
 
     def _finish(self, vp, m):
-        selected = set(self.selection)
-        def mutate(scene):
-            for x in selected:
-                if isinstance(x, Group):
-                    if x.xform is not None:
-                        x.xform = QMatrix4x4(m) * x.xform
-                    else:
-                        x.mesh = transformed_mesh(x.mesh, m)
-                        if getattr(x, "axes", None) is not None:
-                            x.axes = QMatrix4x4(m) * x.axes
-            scene.selection.clear()
+        selected = [x for x in self.selection if isinstance(x, Group)]
+
+        def apply_transform(g: Group) -> None:
+            if g.xform is not None:
+                g.xform = QMatrix4x4(m) * g.xform
+            else:
+                g.mesh = transformed_mesh(g.mesh, m)
+                if getattr(g, "axes", None) is not None:
+                    g.axes = QMatrix4x4(m) * g.axes
+
+        cmd = XformGroupsCommand(
+            apply_transform, selected, label=_t("Rotate 3D")
+        )
 
         try:
-            vp.history.execute(SnapshotImport(mutate))
+            vp.history.execute(cmd)
             if vp.history.last_error:
                 vp.flash_status(f"Rotation failed: {vp.history.last_error}", 6000)
                 _log(vp.history.last_error)
             else:
+                vp.scene.selection.clear()
                 vp.notify_scene_changed()
                 vp.update()
                 vp.flash_status(_t("Rotation completed."), 3000)

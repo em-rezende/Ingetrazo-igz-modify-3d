@@ -18,8 +18,8 @@
 # =========================================================================
 # Extension: IGZ Modify 3D — package entry point
 # Author: Ezequiel M Rezende
-# Version: 1.0.0
-# Date: 2026-10-05
+# Version: 1.0.1
+# Date: 2026-10-06
 # License: GPL-3.0-or-later (same as IngeTrazo)
 #
 # IngeTrazo — "3D Modifiers" toolbar (Mirror, Scale, Rotate, Align, Array,

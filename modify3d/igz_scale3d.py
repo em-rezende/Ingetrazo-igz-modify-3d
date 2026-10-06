@@ -17,28 +17,28 @@
 
 # =========================================================================
 # Extension: igz_scale3d (Subpasta modify3d)
+# Author: Ezequiel M Rezende
+# Version: 1.0.1
+# License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations
 
-import copy
-import os
 import sys
 import traceback
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QAction, QIcon, QMatrix4x4, QVector3D, QPen, QColor
-from PySide6.QtWidgets import QMessageBox, QToolBar, QSizePolicy
+from PySide6.QtGui import QMatrix4x4, QVector3D
 
 from tools.base import Tool, ToolContext
 from core.group import Group, transformed_mesh
-from core.mesh import Face, Edge
-from core.history import SnapshotImport
+from igz_xform_command import XformGroupsCommand
 
 DEBUG = True
+
 
 def _log(s):
     if DEBUG:
         print(f"[igz_scale3d] {s}", file=sys.stderr, flush=True)
+
 
 try:
     from core.i18n import tr, current_language
@@ -47,6 +47,7 @@ except Exception:
         return s.format(**kw) if kw else s
     def current_language():
         return "en"
+
 
 _LOCAL = {
     "pt-BR": {
@@ -57,9 +58,10 @@ _LOCAL = {
         "P1 captured — click reference point (P2)": "P1 capturado — clique no ponto de referência (P2)",
         "P2 captured — move and click target point (P3)": "P2 capturado — mova e clique no ponto de destino (P3)",
         "Points must not coincide.": "Os pontos não podem coincidir.",
-        "Scale completed.": "Escala concluída."
+        "Scale completed.": "Escala concluída.",
     }
 }
+
 
 def _t(s):
     try:
@@ -70,7 +72,9 @@ def _t(s):
         pass
     return _LOCAL.get(current_language(), {}).get(s, s)
 
+
 _EPS = 1e-8
+
 
 def _scale_matrix(p1, p2, p3):
     v1 = QVector3D(p2) - QVector3D(p1)
@@ -86,12 +90,13 @@ def _scale_matrix(p1, p2, p3):
     m.translate(-p1)
     return m
 
+
 class Scale3dTool(Tool):
     name = "Scale by 3 Points"
     shortcut = None
     description = "Scale the selected objects using three reference points with bounding box preview."
     uses_snap = True
-    wireframe_color = (0.08, 0.47, 0.84, 0.95)
+    wireframe_color = (1.0, 0.65, 0.0, 0.95)   # laranja
     wireframe_depth_tested = False
     _instance = None
 
@@ -103,11 +108,11 @@ class Scale3dTool(Tool):
         self.bbox_min = None
         self.bbox_max = None
 
+    # ------------------------------------------------------------------ #
+    # ciclo de vida do tool
+    # ------------------------------------------------------------------ #
     def on_activate(self, vp):
-        self.points = []
-        self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        self._clear_preview()
         self.selection = set(getattr(vp.scene, "selection", set()))
         if not self.selection:
             vp.flash_status(_t("Select objects before starting Scale 3D."), 4000)
@@ -117,18 +122,23 @@ class Scale3dTool(Tool):
         _log(f"selection={len(self.selection)}")
 
     def on_deactivate(self, vp):
-        self.points = []
-        self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        self._clear_preview()
+        try:
+            vp.update()
+        except Exception:
+            pass
 
     def on_cancel(self, vp):
-        self.points = []
-        self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        self._clear_preview()
         vp.flash_status("", 0)
+        try:
+            vp.update()
+        except Exception:
+            pass
 
+    # ------------------------------------------------------------------ #
+    # input
+    # ------------------------------------------------------------------ #
     def on_hover(self, ctx: ToolContext):
         if len(self.points) == 2:
             self.current_mouse_pos = QVector3D(ctx.world)
@@ -136,9 +146,11 @@ class Scale3dTool(Tool):
     def on_click(self, ctx: ToolContext):
         self.points.append(QVector3D(ctx.world))
         vp = ctx.viewport
+
         if len(self.points) == 1:
             vp.flash_status(_t("P1 captured — click reference point (P2)"), 5000)
             return
+
         if len(self.points) == 2:
             try:
                 self.bbox_min, self.bbox_max = vp.scene.selection_bounds()
@@ -151,7 +163,8 @@ class Scale3dTool(Tool):
             vp.flash_status(_t("P2 captured — move and click target point (P3)"), 5000)
             _log(f"bbox={self.bbox_min} -> {self.bbox_max}")
             return
-        
+
+        # Terceiro clique: calcula a matriz, limpa o preview e finaliza.
         self.current_mouse_pos = None
         m = _scale_matrix(*self.points)
         if m is None:
@@ -159,8 +172,16 @@ class Scale3dTool(Tool):
             self.points = []
             vp.flash_status(_t("Scale 3D — click base point (P1)"), 5000)
             return
+
+        # Zera o preview ANTES de finalizar, para o viewport não redesenhar
+        # o bounding box durante o notify_scene_changed do _finish.
+        self._clear_preview()
+        vp.update()
         self._finish(vp, m)
 
+    # ------------------------------------------------------------------ #
+    # preview
+    # ------------------------------------------------------------------ #
     def rubber_band_lines(self):
         if (len(self.points) != 2 or self.current_mouse_pos is None
                 or self.bbox_min is None or self.bbox_max is None):
@@ -202,43 +223,60 @@ class Scale3dTool(Tool):
             traceback.print_exc()
             return []
 
+    # ------------------------------------------------------------------ #
+    # execução
+    # ------------------------------------------------------------------ #
     def _finish(self, vp, m):
-        selected = set(self.selection)
-        def mutate(scene):
-            for x in selected:
-                if isinstance(x, Group):
-                    if x.xform is not None:
-                        x.xform = QMatrix4x4(m) * x.xform
-                    else:
-                        x.mesh = transformed_mesh(x.mesh, m)
-                        if getattr(x, "axes", None) is not None:
-                            x.axes = QMatrix4x4(m) * x.axes
-            scene.selection.clear()
+        selected = [x for x in self.selection if isinstance(x, Group)]
+
+        def apply_transform(g: Group) -> None:
+            if g.xform is not None:
+                g.xform = QMatrix4x4(m) * g.xform
+            else:
+                g.mesh = transformed_mesh(g.mesh, m)
+                if getattr(g, "axes", None) is not None:
+                    g.axes = QMatrix4x4(m) * g.axes
+
+        cmd = XformGroupsCommand(
+            apply_transform, selected, label=_t("Scale 3D")
+        )
 
         try:
-            vp.history.execute(SnapshotImport(mutate))
+            vp.history.execute(cmd)
             if vp.history.last_error:
                 vp.flash_status(f"Scale failed: {vp.history.last_error}", 6000)
                 _log(vp.history.last_error)
             else:
+                vp.scene.selection.clear()
                 vp.notify_scene_changed()
-                vp.update()
                 vp.flash_status(_t("Scale completed."), 3000)
         except Exception:
             traceback.print_exc()
             vp.flash_status("Scale failed — see the IngeTrazo log.", 6000)
         finally:
-            self.points = []
-            self.current_mouse_pos = None
-            self.bbox_min = None
-            self.bbox_max = None
+            self._clear_preview()
+            try:
+                vp.update()
+            except Exception:
+                pass
             try:
                 from tools.select import SelectTool
                 vp.set_active_tool(SelectTool())
             except Exception:
                 vp.set_active_tool(None)
 
+    # ------------------------------------------------------------------ #
+    # helpers internos
+    # ------------------------------------------------------------------ #
+    def _clear_preview(self):
+        self.points = []
+        self.current_mouse_pos = None
+        self.bbox_min = None
+        self.bbox_max = None
+
+
 def setup(app):
     pass
+
 
 __all__ = ["Scale3dTool", "setup"]
