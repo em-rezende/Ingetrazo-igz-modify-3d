@@ -16,7 +16,7 @@
 # =========================================================================
 
 # =========================================================================
-# Extension: igz_align3d (Subpasta modify3d) - Estilo AutoCAD (Pares Alternados)
+# Extension: igz_align3d - Estilo AutoCAD (Pares Alternados)
 # Author: Ezequiel M Rezende
 # Version: 1.0.1
 # License: GPL-3.0-or-later (same as IngeTrazo)

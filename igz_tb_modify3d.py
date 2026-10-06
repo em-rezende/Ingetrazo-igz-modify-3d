@@ -110,9 +110,8 @@ def setup(app):
         return
 
     base_dir = os.path.dirname(os.path.abspath(__file__))
-    modify3d_dir = os.path.join(base_dir, "modify3d")
-    if modify3d_dir not in sys.path:
-        sys.path.insert(0, modify3d_dir)
+    if base_dir not in sys.path:
+        sys.path.insert(0, base_dir)
 
     try:
         import igz_mirror3d
@@ -122,7 +121,7 @@ def setup(app):
         import igz_array3d
         import igz_polararray3d
     except Exception as e:
-        _log(f"Erro ao importar os scripts da pasta modify3d: {e}")
+        _log(f"Erro ao importar os módulos da extensão: {e}")
         traceback.print_exc(file=sys.stderr)
         return
 
@@ -135,7 +134,7 @@ def setup(app):
     tb.setToolButtonStyle(Qt.ToolButtonIconOnly)
     tb.setSizePolicy(QSizePolicy.Maximum, QSizePolicy.Fixed)
 
-    icons_dir = os.path.join(modify3d_dir, "icons")
+    icons_dir = os.path.join(base_dir, "icons")
 
     # --- 1. Botão Mirror 3D ---
     act_mirror = QAction(_get_themed_icon(icons_dir, "tb_mirror3d", window), igz_mirror3d._t("Mirror by 3 Points"), tb)

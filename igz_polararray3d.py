@@ -16,7 +16,7 @@
 # =========================================================================
 
 # =========================================================================
-# Extension: igz_polararray3d (Subpasta modify3d) - Eixo Arbitrário 3D
+# Extension: igz_polararray3d - Eixo Arbitrário 3D
 # Author: Ezequiel M Rezende
 # Version: 1.0.1
 # License: GPL-3.0-or-later (same as IngeTrazo)

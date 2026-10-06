@@ -8,8 +8,8 @@
 #
 # The catalog installs ONE file per entry: a .py file, or a .zip holding a
 # single folder with an __init__.py (see TEMPLATE.toml in that repository).
-# This plugin is a package (root __init__.py + igz_tb_modify3d.py + the
-# modify3d/ tools subpackage), so it needs the zip form.
+# This plugin is a package (a root __init__.py plus the igz_*.py modules and
+# the icons/ folder), so it needs the zip form.
 #
 # The archive is built deterministically on purpose: fixed timestamps,
 # sorted entries and a fixed create-system, so its SHA-256 changes ONLY when
@@ -38,11 +38,11 @@ DIST = os.path.join(ROOT, "dist")
 PACKAGE = "igz_modify3d"
 ZIP_NAME = f"{PACKAGE}.zip"
 
-#: Files copied from the repository root into the package folder.
-ROOT_FILES = ["__init__.py", "igz_tb_modify3d.py", "LICENSE", "README.md"]
+#: Fixed files copied from the repository root into the package folder.
+ROOT_FILES = ["__init__.py", "LICENSE", "README.md"]
 
-#: Sub-folder copied recursively (tool modules + icons).
-SUBPACKAGE = "modify3d"
+#: Folder copied recursively (SVG icon assets).
+ICONS_DIR = "icons"
 
 #: Fixed timestamp so the archive is byte-for-byte reproducible.
 FIXED_DATE = (2026, 1, 1, 0, 0, 0)
@@ -72,14 +72,22 @@ def collect_entries() -> list[tuple[str, bytes]]:
         if os.path.isfile(path):
             entries.append((f"{PACKAGE}/{name}", _read(path)))
 
-    sub = os.path.join(ROOT, SUBPACKAGE)
-    for base, _dirs, files in os.walk(sub):
+    # Every igz_*.py module at the repository root (loader + tools).
+    for name in sorted(os.listdir(ROOT)):
+        if name.startswith("igz_") and name.endswith(".py"):
+            path = os.path.join(ROOT, name)
+            if os.path.isfile(path):
+                entries.append((f"{PACKAGE}/{name}", _read(path)))
+
+    # The icons/ folder (SVG assets), recursively.
+    icons = os.path.join(ROOT, ICONS_DIR)
+    for base, _dirs, files in os.walk(icons):
         if "__pycache__" in base:
             continue
         for name in files:
             path = os.path.join(base, name)
-            rel = os.path.relpath(path, sub).replace(os.sep, "/")
-            entries.append((f"{PACKAGE}/{SUBPACKAGE}/{rel}", _read(path)))
+            rel = os.path.relpath(path, icons).replace(os.sep, "/")
+            entries.append((f"{PACKAGE}/{ICONS_DIR}/{rel}", _read(path)))
 
     entries.sort(key=lambda item: item[0])
     return entries

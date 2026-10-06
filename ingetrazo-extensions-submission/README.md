@@ -21,7 +21,7 @@ in the template checklist.
   `igz_modify3d.zip`, so create that tag/release in this repository first and
   upload `dist/igz_modify3d.zip` as the asset with that exact name.
 - The `sha256` in the entry must match that asset byte-for-byte:
-  `7ae197f031c258e61db197dcdf2d83f74a52f597509e8e679614d6d432e6adf1`.
+  `d469be60a0a20266ca29579a48249c434f12d939a22cebfc94e8f1532b3c9118`.
   Rebuild with `packaging/build_extension.ps1` (or
   `packaging/build_extension.py`) if the code changed, and paste the value it
   prints. (If it is wrong, the catalog's automatic check tells you the right
@@ -46,4 +46,4 @@ delete-the-originals** (the in-place / removal tools now commit an undo-aware
    > Mirror-with-delete now restore the exact previous state on Ctrl+Z, and the
    > mirrored originals come back. The entry now points at the `v1.0.1` release
    > asset — `sha256`
-   > `7ae197f031c258e61db197dcdf2d83f74a52f597509e8e679614d6d432e6adf1`.
+   > `d469be60a0a20266ca29579a48249c434f12d939a22cebfc94e8f1532b3c9118`.

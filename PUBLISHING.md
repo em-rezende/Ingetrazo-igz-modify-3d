@@ -21,7 +21,7 @@ catálogo <https://github.com/ingelibre/ingetrazo-extensions> (mostrado em
 | Código limpo | `igz_tb_modify3d.py` | Artefato `[cite: 1]` removido (linha do `raise`); cabeçalho com **Version: 1.0.1**. |
 | Ponto de entrada robusto | `__init__.py` | Carrega `igz_tb_modify3d.py` por caminho de arquivo e expõe `setup(app)` — funciona se o IngeTrazo importar o pacote ou o arquivo. |
 | Empacotador | `packaging/build_extension.ps1` (Windows) e `packaging/build_extension.py` (multi-plataforma) | Gera um `.zip` determinístico com **uma** pasta de topo `igz_modify3d/`. |
-| Artefato | `dist/igz_modify3d.zip` | Já construído (v1.0.1). **sha256** = `7ae197f031c258e61db197dcdf2d83f74a52f597509e8e679614d6d432e6adf1`. |
+| Artefato | `dist/igz_modify3d.zip` | Já construído (v1.0.1). **sha256** = `d469be60a0a20266ca29579a48249c434f12d939a22cebfc94e8f1532b3c9118`. |
 | Ficha do catálogo | `ingetrazo-extensions-submission/extensions/igz_modify3d.toml` | Copiar para `extensions/igz_modify3d.toml` no repositório do catálogo. |
 | Captura de tela | `ingetrazo-extensions-submission/screenshots/igz_modify3d.png` | Copiar para `screenshots/igz_modify3d.png` (imagem atual de `screenshots/igz-modify-3d.png`). |
 
@@ -31,22 +31,21 @@ O `.zip` contém exatamente uma pasta de topo:
 igz_modify3d/
 ├── __init__.py            # setup(app)
 ├── igz_tb_modify3d.py     # carregador/barra
-├── modify3d/
-│   ├── igz_mirror3d.py
-│   ├── igz_scale3d.py
-│   ├── igz_rotate3d.py
-│   ├── igz_align3d.py
-│   ├── igz_array3d.py
-│   ├── igz_polararray3d.py
-│   ├── igz_xform_command.py
-│   └── icons/*.svg
+├── igz_xform_command.py   # comando undo-aware
+├── igz_mirror3d.py
+├── igz_scale3d.py
+├── igz_rotate3d.py
+├── igz_align3d.py
+├── igz_array3d.py
+├── igz_polararray3d.py
+├── icons/*.svg
 ├── LICENSE
 └── README.md
 ```
 
 O catálogo instala **um arquivo por extensão**: um `.py`, ou um `.zip` com
 **uma** pasta contendo um `__init__.py` (ver `TEMPLATE.toml`). Por isso esta
-extensão, que é um pacote (barra + subpasta `modify3d/` + ícones), usa `.zip`.
+extensão, que é um pacote (barra + módulos `igz_*.py` + ícones), usa `.zip`.
 
 ---
 
@@ -59,7 +58,7 @@ originais" removia grupos — e o `SnapshotImport` do hospedeiro só sabe revert
 *adições*. Sintoma reportado: depois do *undo*, os objetos continuavam escalados,
 rotacionados ou movidos, e no Espelho os originais não voltavam.
 
-Corrigido em **v1.0.1** com `modify3d/igz_xform_command.py`:
+Corrigido em **v1.0.1** com `igz_xform_command.py`:
 
 - `XformGroupsCommand` guarda, por grupo, o `xform` / `mesh` / `axes` originais
   (e o índice no `scene.groups` quando o grupo é removido) e restaura tudo em
@@ -178,6 +177,6 @@ entry file and a screenshot). Once you authorise it:
    file deletion).
 
 The **sha256** in the entry
-(`7ae197f031c258e61db197dcdf2d83f74a52f597509e8e679614d6d432e6adf1`) is the
+(`d469be60a0a20266ca29579a48249c434f12d939a22cebfc94e8f1532b3c9118`) is the
 fingerprint of `dist/igz_modify3d.zip` as built by the script. It **must**
 match the uploaded asset; if you rebuild, update the value.

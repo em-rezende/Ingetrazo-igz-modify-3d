@@ -7,8 +7,7 @@
 #
 # Windows / PowerShell builder — no Python needed. It produces the SAME
 # archive layout as packaging/build_extension.py: one top-level folder,
-# igz_modify3d/, holding __init__.py + igz_tb_modify3d.py + modify3d/
-# (tools and icons) + docs.
+# igz_modify3d/, holding __init__.py + the igz_*.py modules + icons/ + docs.
 #
 # The catalog installs ONE file per entry: a .py file, or a .zip holding a
 # single folder with an __init__.py (see TEMPLATE.toml in that repository).
@@ -59,19 +58,21 @@ function Add-Entry([string]$arc, [string]$src) {
     $entries.Add([pscustomobject]@{ Arc = $arc; Src = $src })
 }
 
-# Package root files.
-Add-Entry "$package/__init__.py" (Join-Path $root '__init__.py')
-Add-Entry "$package/igz_tb_modify3d.py" (Join-Path $root 'igz_tb_modify3d.py')
-foreach ($f in @('LICENSE', 'README.md')) {
+# Package root files: the entry point, every igz_*.py module, and the docs.
+$rootFiles = @('__init__.py')
+$rootFiles += (Get-ChildItem -LiteralPath $root -Filter 'igz_*.py' -File |
+    Sort-Object Name | ForEach-Object { $_.Name })
+$rootFiles += @('LICENSE', 'README.md')
+foreach ($f in $rootFiles) {
     Add-Entry "$package/$f" (Join-Path $root $f)
 }
 
-# The modify3d/ tools subpackage (modules + icons), recursively.
-$sub = Join-Path $root 'modify3d'
-if (Test-Path -LiteralPath $sub) {
-    Get-ChildItem -LiteralPath $sub -Recurse -File | ForEach-Object {
-        $rel = $_.FullName.Substring($sub.Length + 1) -replace '\\', '/'
-        Add-Entry "$package/modify3d/$rel" $_.FullName
+# The icons/ folder (SVG assets), recursively.
+$icons = Join-Path $root 'icons'
+if (Test-Path -LiteralPath $icons) {
+    Get-ChildItem -LiteralPath $icons -Recurse -File | ForEach-Object {
+        $rel = $_.FullName.Substring($icons.Length + 1) -replace '\\', '/'
+        Add-Entry "$package/icons/$rel" $_.FullName
     }
 }
 

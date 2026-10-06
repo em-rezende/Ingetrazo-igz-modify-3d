@@ -16,33 +16,29 @@
 # =========================================================================
 
 # =========================================================================
-# Extension: igz_rotate3d (Subpasta modify3d)
+# Extension: igz_scale3d
 # Author: Ezequiel M Rezende
 # Version: 1.0.1
 # License: GPL-3.0-or-later (same as IngeTrazo)
 # =========================================================================
 from __future__ import annotations
 
-import copy
-import os
 import sys
 import traceback
-import math
 
-from PySide6.QtCore import Qt, QSize
-from PySide6.QtGui import QAction, QIcon, QMatrix4x4, QVector3D, QPen, QColor
-from PySide6.QtWidgets import QMessageBox, QToolBar, QSizePolicy
+from PySide6.QtGui import QMatrix4x4, QVector3D
 
 from tools.base import Tool, ToolContext
 from core.group import Group, transformed_mesh
-from core.mesh import Face, Edge
 from igz_xform_command import XformGroupsCommand
 
 DEBUG = True
 
+
 def _log(s):
     if DEBUG:
-        print(f"[igz_rotate3d] {s}", file=sys.stderr, flush=True)
+        print(f"[igz_scale3d] {s}", file=sys.stderr, flush=True)
+
 
 try:
     from core.i18n import tr, current_language
@@ -52,18 +48,20 @@ except Exception:
     def current_language():
         return "en"
 
+
 _LOCAL = {
     "pt-BR": {
-        "Rotate 3D": "Rotacionar 3D",
-        "Rotate by 3 Points": "Rotacionar por 3 Pontos",
-        "Select objects before starting Rotate 3D.": "Selecione os objetos antes de iniciar a Rotação 3D.",
-        "Rotate 3D — click rotation center (P1)": "Rotacionar 3D — clique no centro de rotação (P1)",
+        "Scale 3D": "Escalar 3D",
+        "Scale by 3 Points": "Escalar por 3 Pontos",
+        "Select objects before starting Scale 3D.": "Selecione os objetos antes de iniciar a Escala 3D.",
+        "Scale 3D — click base point (P1)": "Escalar 3D — clique no ponto base (P1)",
         "P1 captured — click reference point (P2)": "P1 capturado — clique no ponto de referência (P2)",
-        "P2 captured — move and click target angle point (P3)": "P2 capturado — mova e clique no ponto de ângulo de destino (P3)",
-        "Points are collinear or coincide.": "Os pontos são colineares ou coincidem.",
-        "Rotation completed.": "Rotação concluída."
+        "P2 captured — move and click target point (P3)": "P2 capturado — mova e clique no ponto de destino (P3)",
+        "Points must not coincide.": "Os pontos não podem coincidir.",
+        "Scale completed.": "Escala concluída.",
     }
 }
+
 
 def _t(s):
     try:
@@ -74,91 +72,73 @@ def _t(s):
         pass
     return _LOCAL.get(current_language(), {}).get(s, s)
 
+
 _EPS = 1e-8
 
-def _rotation_matrix(p1, p2, p3):
+
+def _scale_matrix(p1, p2, p3):
     v1 = QVector3D(p2) - QVector3D(p1)
     v2 = QVector3D(p3) - QVector3D(p1)
-    
     l1 = v1.length()
     l2 = v2.length()
     if l1 <= _EPS or l2 <= _EPS:
         return None
-
-    v1.normalize()
-    v2.normalize()
-
-    axis = QVector3D.crossProduct(v1, v2)
-    axis_len = axis.length()
-    if axis_len <= _EPS:
-        dot = QVector3D.dotProduct(v1, v2)
-        if dot < 0:
-            arbitrary = QVector3D(1, 0, 0)
-            if abs(QVector3D.dotProduct(v1, arbitrary)) > 0.9:
-                arbitrary = QVector3D(0, 1, 0)
-            axis = QVector3D.crossProduct(v1, arbitrary)
-            axis.normalize()
-            m = QMatrix4x4()
-            m.translate(p1)
-            m.rotate(180.0, axis)
-            m.translate(-p1)
-            return m
-        return QMatrix4x4()
-
-    axis.normalize()
-    dot = max(-1.0, min(1.0, QVector3D.dotProduct(v1, v2)))
-    angle_rad = math.acos(dot)
-    angle_deg = math.degrees(angle_rad)
-
+    s = l2 / l1
     m = QMatrix4x4()
     m.translate(p1)
-    m.rotate(angle_deg, axis)
+    m.scale(s, s, s)
     m.translate(-p1)
     return m
 
-class Rotate3dTool(Tool):
-    name = "Rotate by 3 Points"
+
+class Scale3dTool(Tool):
+    name = "Scale by 3 Points"
     shortcut = None
-    description = "Rotate the selected objects using three reference points with bounding box preview."
+    description = "Scale the selected objects using three reference points with bounding box preview."
     uses_snap = True
-    wireframe_color = (1.0, 0.65, 0.0, 0.95)  # laranja
+    wireframe_color = (1.0, 0.65, 0.0, 0.95)   # laranja
     wireframe_depth_tested = False
     _instance = None
 
     def __init__(self):
-        Rotate3dTool._instance = self
+        Scale3dTool._instance = self
         self.points = []
         self.selection = set()
         self.current_mouse_pos = None
         self.bbox_min = None
         self.bbox_max = None
 
+    # ------------------------------------------------------------------ #
+    # ciclo de vida do tool
+    # ------------------------------------------------------------------ #
     def on_activate(self, vp):
-        self.points = []
-        self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        self._clear_preview()
         self.selection = set(getattr(vp.scene, "selection", set()))
         if not self.selection:
-            vp.flash_status(_t("Select objects before starting Rotate 3D."), 4000)
+            vp.flash_status(_t("Select objects before starting Scale 3D."), 4000)
             vp.set_active_tool(None)
             return
-        vp.flash_status(_t("Rotate 3D — click rotation center (P1)"), 5000)
+        vp.flash_status(_t("Scale 3D — click base point (P1)"), 5000)
         _log(f"selection={len(self.selection)}")
 
     def on_deactivate(self, vp):
-        self.points = []
-        self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        self._clear_preview()
+        try:
+            vp.update()
+        except Exception:
+            pass
 
     def on_cancel(self, vp):
-        self.points = []
-        self.current_mouse_pos = None
-        self.bbox_min = None
-        self.bbox_max = None
+        self._clear_preview()
         vp.flash_status("", 0)
+        try:
+            vp.update()
+        except Exception:
+            pass
 
+    # ------------------------------------------------------------------ #
+    # input
+    # ------------------------------------------------------------------ #
     def on_hover(self, ctx: ToolContext):
         if len(self.points) == 2:
             self.current_mouse_pos = QVector3D(ctx.world)
@@ -166,9 +146,11 @@ class Rotate3dTool(Tool):
     def on_click(self, ctx: ToolContext):
         self.points.append(QVector3D(ctx.world))
         vp = ctx.viewport
+
         if len(self.points) == 1:
             vp.flash_status(_t("P1 captured — click reference point (P2)"), 5000)
             return
+
         if len(self.points) == 2:
             try:
                 self.bbox_min, self.bbox_max = vp.scene.selection_bounds()
@@ -178,26 +160,36 @@ class Rotate3dTool(Tool):
 
             self.current_mouse_pos = QVector3D(self.points[1])
             vp.update()
-            vp.flash_status(_t("P2 captured — move and click target angle point (P3)"), 5000)
+            vp.flash_status(_t("P2 captured — move and click target point (P3)"), 5000)
+            _log(f"bbox={self.bbox_min} -> {self.bbox_max}")
             return
-        
+
+        # Terceiro clique: calcula a matriz, limpa o preview e finaliza.
         self.current_mouse_pos = None
-        m = _rotation_matrix(*self.points)
+        m = _scale_matrix(*self.points)
         if m is None:
-            vp.flash_status(_t("Points are collinear or coincide."), 4000)
+            vp.flash_status(_t("Points must not coincide."), 4000)
             self.points = []
-            vp.flash_status(_t("Rotate 3D — click rotation center (P1)"), 5000)
+            vp.flash_status(_t("Scale 3D — click base point (P1)"), 5000)
             return
+
+        # Zera o preview ANTES de finalizar, para o viewport não redesenhar
+        # o bounding box durante o notify_scene_changed do _finish.
+        self._clear_preview()
+        vp.update()
         self._finish(vp, m)
 
+    # ------------------------------------------------------------------ #
+    # preview
+    # ------------------------------------------------------------------ #
     def rubber_band_lines(self):
         if (len(self.points) != 2 or self.current_mouse_pos is None
                 or self.bbox_min is None or self.bbox_max is None):
             return []
 
         try:
-            m = _rotation_matrix(self.points[0], self.points[1],
-                                 self.current_mouse_pos)
+            m = _scale_matrix(self.points[0], self.points[1],
+                              self.current_mouse_pos)
             if m is None:
                 return []
 
@@ -231,6 +223,9 @@ class Rotate3dTool(Tool):
             traceback.print_exc()
             return []
 
+    # ------------------------------------------------------------------ #
+    # execução
+    # ------------------------------------------------------------------ #
     def _finish(self, vp, m):
         selected = [x for x in self.selection if isinstance(x, Group)]
 
@@ -243,34 +238,45 @@ class Rotate3dTool(Tool):
                     g.axes = QMatrix4x4(m) * g.axes
 
         cmd = XformGroupsCommand(
-            apply_transform, selected, label=_t("Rotate 3D")
+            apply_transform, selected, label=_t("Scale 3D")
         )
 
         try:
             vp.history.execute(cmd)
             if vp.history.last_error:
-                vp.flash_status(f"Rotation failed: {vp.history.last_error}", 6000)
+                vp.flash_status(f"Scale failed: {vp.history.last_error}", 6000)
                 _log(vp.history.last_error)
             else:
                 vp.scene.selection.clear()
                 vp.notify_scene_changed()
-                vp.update()
-                vp.flash_status(_t("Rotation completed."), 3000)
+                vp.flash_status(_t("Scale completed."), 3000)
         except Exception:
             traceback.print_exc()
-            vp.flash_status("Rotation failed — see the IngeTrazo log.", 6000)
+            vp.flash_status("Scale failed — see the IngeTrazo log.", 6000)
         finally:
-            self.points = []
-            self.current_mouse_pos = None
-            self.bbox_min = None
-            self.bbox_max = None
+            self._clear_preview()
+            try:
+                vp.update()
+            except Exception:
+                pass
             try:
                 from tools.select import SelectTool
                 vp.set_active_tool(SelectTool())
             except Exception:
                 vp.set_active_tool(None)
 
+    # ------------------------------------------------------------------ #
+    # helpers internos
+    # ------------------------------------------------------------------ #
+    def _clear_preview(self):
+        self.points = []
+        self.current_mouse_pos = None
+        self.bbox_min = None
+        self.bbox_max = None
+
+
 def setup(app):
     pass
 
-__all__ = ["Rotate3dTool", "setup"]
+
+__all__ = ["Scale3dTool", "setup"]

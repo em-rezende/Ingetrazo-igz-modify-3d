@@ -68,12 +68,12 @@ its operation in the application's undo/redo history.
 
 | Tool | Toolbar button | Icon | Description |
 | --- | --- | --- | --- |
-| **Mirror 3D** | Mirror by 3 Points | ![Mirror](modify3d/icons/tb_mirror3d.svg) | Reflects the selection across a plane defined by three points. Optionally deletes the originals. |
-| **Scale 3D** | Scale by 3 Points | ![Scale](modify3d/icons/tb_scale3d.svg) | Uniformly scales the selection about a base point using a reference distance and a target distance. |
-| **Rotate 3D** | Rotate by 3 Points | ![Rotate](modify3d/icons/tb_rotate3d.svg) | Rotates the selection around an axis derived from three points (center, reference, target). |
-| **Align 3D** | Align by Points | ![Align](modify3d/icons/tb_align3d.svg) | AutoCAD-style alignment using three source points and their three matching target points. |
-| **Array 3D** | Array by 2 Points | ![Array](modify3d/icons/tb_array3d.svg) | Creates copies of the selection along an offset vector (base point + step point). |
-| **Polar Array 3D** | Polar Array by Axis | ![Polar Array](modify3d/icons/tb_polararray3d.svg) | Creates copies of the selection rotated around an arbitrary 3D axis defined by two points. |
+| **Mirror 3D** | Mirror by 3 Points | ![Mirror](icons/tb_mirror3d.svg) | Reflects the selection across a plane defined by three points. Optionally deletes the originals. |
+| **Scale 3D** | Scale by 3 Points | ![Scale](icons/tb_scale3d.svg) | Uniformly scales the selection about a base point using a reference distance and a target distance. |
+| **Rotate 3D** | Rotate by 3 Points | ![Rotate](icons/tb_rotate3d.svg) | Rotates the selection around an axis derived from three points (center, reference, target). |
+| **Align 3D** | Align by Points | ![Align](icons/tb_align3d.svg) | AutoCAD-style alignment using three source points and their three matching target points. |
+| **Array 3D** | Array by 2 Points | ![Array](icons/tb_array3d.svg) | Creates copies of the selection along an offset vector (base point + step point). |
+| **Polar Array 3D** | Polar Array by Axis | ![Polar Array](icons/tb_polararray3d.svg) | Creates copies of the selection rotated around an arbitrary 3D axis defined by two points. |
 
 ---
 
@@ -95,7 +95,7 @@ from core.i18n import tr, current_language
 ```
 
 The in-place tools (Scale, Rotate, Align and Mirror-with-delete) also use the
-plugin's own `modify3d/igz_xform_command.py` — an undo-aware command that captures
+plugin's own `igz_xform_command.py` — an undo-aware command that captures
 and restores each group's previous `xform` / `mesh` / `axes`, and re-inserts a
 deleted group at its original index in `scene.groups`.
 
@@ -242,35 +242,39 @@ Each copy is named `"<original> (Polar n)"`.
 Ingetrazo-igz-modify-3d/
 ├── __init__.py                # Package entry point — exposes setup()
 ├── igz_tb_modify3d.py         # Main loader — builds the "3D Modifiers" toolbar
-├── modify3d/
-│   ├── igz_align3d.py         # Align by Points tool
-│   ├── igz_array3d.py         # Array by 2 Points tool
-│   ├── igz_mirror3d.py        # Mirror by 3 Points tool
-│   ├── igz_polararray3d.py    # Polar Array by Axis tool
-│   ├── igz_rotate3d.py        # Rotate by 3 Points tool
-│   ├── igz_scale3d.py         # Scale by 3 Points tool
-│   ├── igz_xform_command.py   # Undo-aware transform / removal command
-│   └── icons/
-│       ├── tb_align3d.svg          # dark-theme icon
-│       ├── tb_align3d_light.svg    # light-theme icon
-│       ├── tb_array3d.svg
-│       ├── tb_array3d_light.svg
-│       ├── tb_mirror3d.svg
-│       ├── tb_mirror3d_light.svg
-│       ├── tb_polararray3d.svg
-│       ├── tb_polararray3d_light.svg
-│       ├── tb_rotate3d.svg
-│       ├── tb_rotate3d_light.svg
-│       ├── tb_scale3d.svg
-│       └── tb_scale3d_light.svg
+├── igz_xform_command.py       # Undo-aware transform / removal command
+├── igz_align3d.py             # Align by Points tool
+├── igz_array3d.py             # Array by 2 Points tool
+├── igz_mirror3d.py            # Mirror by 3 Points tool
+├── igz_polararray3d.py        # Polar Array by Axis tool
+├── igz_rotate3d.py            # Rotate by 3 Points tool
+├── igz_scale3d.py             # Scale by 3 Points tool
+├── icons/
+│   ├── tb_align3d.svg          # dark-theme icon
+│   ├── tb_align3d_light.svg    # light-theme icon
+│   ├── tb_array3d.svg
+│   ├── tb_array3d_light.svg
+│   ├── tb_mirror3d.svg
+│   ├── tb_mirror3d_light.svg
+│   ├── tb_polararray3d.svg
+│   ├── tb_polararray3d_light.svg
+│   ├── tb_rotate3d.svg
+│   ├── tb_rotate3d_light.svg
+│   ├── tb_scale3d.svg
+│   └── tb_scale3d_light.svg
+├── packaging/                 # Reproducible .zip builders for the catalog
+├── screenshots/               # Repository screenshots
+├── ingetrazo-extensions-submission/   # Bundle to copy into the catalog PR
 ├── Desenvolvimento/           # CorelDRAW (.cdr) icon sources — not versioned
 ├── LICENSE                    # GNU General Public License v3
 ├── README.md
+├── PUBLISHING.md              # Catalog release / submission guide
 └── .gitignore
 ```
 
-The `modify3d` subfolder is added to `sys.path` at load time so that each tool
-module can be imported as a top-level module (`import igz_mirror3d`).
+The plugin folder is added to `sys.path` at load time so that each module can be
+imported as a top-level module (`import igz_mirror3d`). The archive shipped to the
+catalog has this exact flat layout inside its `igz_modify3d/` top folder.
 
 ---
 
@@ -301,7 +305,7 @@ language code returned by `current_language()`.
 
 ## Theming and Icons
 
-Icons are SVG files stored in `modify3d/icons/`. Each tool has two variants:
+Icons are SVG files stored in `icons/`. Each tool has two variants:
 
 - `tb_<tool>.svg` — for **dark** interfaces (light-colored artwork).
 - `tb_<tool>_light.svg` — for **light** interfaces (dark-colored artwork).
@@ -331,15 +335,15 @@ means you can override the icons of any tool simply by dropping a
 - **Undo model** — Mirror, Array and Polar Array only *add* groups, which the host
   `SnapshotImport` snapshot reverses on its own. Scale, Rotate and Align mutate
   groups in place, and Mirror-with-delete removes them, so those tools commit an
-  `XformGroupsCommand` (`modify3d/igz_xform_command.py`) instead: it records each
+  `XformGroupsCommand` (`igz_xform_command.py`) instead: it records each
   group's old `xform` / `mesh` / `axes` and its index in `scene.groups`, and
   restores all of it on undo. Mirror-with-delete composes both kinds of command
   through a `CompositeCommand`.
 - **Error handling** — if a command fails, the tool reports
   `… failed — see the IngeTrazo log` and the operation is rolled back.
-- **Extending the toolbar** — to add a tool, create a new `igz_<tool>.py` module in
-  `modify3d/`, import it in `igz_tb_modify3d.py`, and add a `QAction` that sets the
-  tool as the active tool on the viewport.
+- **Extending the toolbar** — to add a tool, create a new `igz_<tool>.py` module
+  next to the others, import it in `igz_tb_modify3d.py`, and add a `QAction` that
+  sets the tool as the active tool on the viewport.
 
 ---
 
@@ -355,7 +359,7 @@ means you can override the icons of any tool simply by dropping a
   group's previous transform/mesh and re-inserts removed groups at their original
   position. This addresses the review on the IngeTrazo extension-catalog pull
   request.
-- Added `modify3d/igz_xform_command.py` (`XformGroupsCommand`, `CompositeCommand`).
+- Added `igz_xform_command.py` (`XformGroupsCommand`, `CompositeCommand`).
 
 ### 1.0.0 — 2026-10-05
 
